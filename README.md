@@ -12,7 +12,7 @@ CLI-first semantic code indexing and navigation plugin for Claude Code.
 **Step 1:** Add the plugin marketplace
 
 ```bash
-/plugin marketplace add nikitakocnev/code-indexer-skill
+/plugin marketplace add lonmstalker/code-indexer-skill
 ```
 
 **Step 2:** Install the plugin

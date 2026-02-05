@@ -2,12 +2,12 @@
   "name": "code-indexer-skill",
   "version": "1.0.0",
   "owner": {
-    "name": "nikitakocnev",
-    "url": "https://github.com/nikitakocnev"
+    "name": "lonmstalker",
+    "url": "https://github.com/lonmstalker"
   },
   "metadata": {
     "description": "CLI-first semantic code indexing and navigation for Claude Code",
-    "repository": "https://github.com/nikitakocnev/code-indexer-skill",
+    "repository": "https://github.com/lonmstalker/code-indexer-skill",
     "license": "MIT",
     "keywords": [
       "code-indexer",
