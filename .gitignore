@@ -1,0 +1,14 @@
+# Code indexer database
+.code-index.db
+
+# Archives
+*.tar.gz
+
+# macOS
+.DS_Store
+
+# IDE
+.idea/
+
+# Build artifacts
+target/
