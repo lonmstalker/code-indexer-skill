@@ -1,205 +1,85 @@
 # Code-Indexer Skill
 
-Agent skill для семантической индексации и навигации по коду с использованием [code-indexer](https://github.com/USER/code-indexer) CLI.
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Claude Code](https://img.shields.io/badge/Claude%20Code-Plugin-blue)](https://claude.ai)
 
-## Возможности
+CLI-first semantic code indexing and navigation plugin for Claude Code.
 
-- **17 языков программирования** с полной поддержкой синтаксиса
-- **12 MCP tools** для AI-агентов (Claude, GPT и др.)
-- **77x быстрее grep** для поиска определений
-- **Semantic analysis** — scope resolution, import resolution, FQDN
-- **Call graph с confidence** — различие между certain и possible вызовами
-- **Fuzzy search** с терпимостью к опечаткам
-- **Git integration** — отслеживание изменённых символов
+**77x faster** than grep for symbol search | **17 languages** | **Tree-sitter powered**
 
-## Производительность
+## Quick Start
 
-Бенчмарк на проекте с 2160 файлами:
-
-| Операция | code-indexer | grep | Ускорение |
-|----------|--------------|------|-----------|
-| Поиск определения | 0.007 сек | 0.539 сек | **77x** |
-| Граф вызовов | 0.007 сек | 0.380 сек | **54x** |
-| Cross-module поиск | 0.011 сек | 0.363 сек | **33x** |
-
----
-
-## Часть 1: Установка CLI
-
-### Системные требования
-
-- **OS**: macOS, Linux, Windows (WSL2)
-- **Rust**: 1.70+ (для сборки из исходников)
-- **RAM**: 512+ MB
-
-### Способ 1: Из исходников (рекомендуется)
+**Step 1:** Add the plugin marketplace
 
 ```bash
-# Клонирование репозитория
-git clone https://github.com/USER/code-indexer
-cd code-indexer
-
-# Сборка release версии
-cargo build --release
-
-# Установка в PATH
-sudo cp target/release/code-indexer /usr/local/bin/
-
-# Или через symlink
-ln -s $(pwd)/target/release/code-indexer /usr/local/bin/code-indexer
+/plugin marketplace add nikitakocnev/code-indexer-skill
 ```
 
-### Способ 2: Cargo install
+**Step 2:** Install the plugin
 
 ```bash
-cargo install --git https://github.com/USER/code-indexer
+/plugin install code-indexer
 ```
 
-### Проверка установки
+That's it! The skill activates automatically on triggers like "find definition", "call graph", "symbols", "code-indexer".
 
-```bash
-code-indexer --version
-code-indexer --help
-```
+## Features
 
-### Быстрый старт CLI
+| Feature | Description |
+|---------|-------------|
+| **Symbol Search** | Find functions, types, classes by name |
+| **Definition Lookup** | Jump to symbol definitions instantly |
+| **Reference Finding** | Locate all usages across codebase |
+| **Call Graph Analysis** | Visualize function call relationships |
+| **Fuzzy Search** | Typo-tolerant symbol matching |
+| **Git Integration** | Track changed symbols between commits |
+| **Dependency Search** | Search symbols in external libraries |
 
-```bash
-# Индексация текущего проекта
-code-indexer index
+## Performance
 
-# Проверка состояния индекса
-code-indexer stats
+Benchmark on 2160-file project:
 
-# Поиск символов
-code-indexer symbols "MyClass"
+| Operation | code-indexer | grep | Speedup |
+|-----------|--------------|------|---------|
+| Find definition | 0.007s | 0.539s | **77x** |
+| Call graph | 0.007s | 0.380s | **54x** |
+| Cross-module search | 0.011s | 0.363s | **33x** |
 
-# Найти определение
-code-indexer definition "UserService"
+## Supported Languages
 
-# Граф вызовов
-code-indexer call-graph "main" --depth 3
-```
+Rust, Java, Kotlin, TypeScript, JavaScript, Python, Go, C#, C++, SQL, Bash, Lua, Swift, Haskell, Elixir, YAML, TOML, HCL
 
----
+## Documentation
 
-## Часть 2: MCP настройка
+- [CLI Usage Guide](docs/usage.md) — Complete command reference
+- [MCP Fallback](docs/mcp-fallback.md) — MCP integration (when CLI unavailable)
 
-Добавьте в `~/.config/claude/claude_desktop_config.json`:
+## Requirements
 
-```json
-{
-  "mcpServers": {
-    "code-indexer": {
-      "command": "/usr/local/bin/code-indexer",
-      "args": ["serve"],
-      "cwd": "/path/to/your/project"
-    }
-  }
-}
-```
+- [code-indexer CLI](https://github.com/lonmstalker/code-indexer) installed and in PATH
+- Claude Code
 
----
-
-## Часть 3: Установка скилла
-
-### Способ 1: Локальная установка (рекомендуется)
-
-```bash
-# Клонировать репозиторий скилла
-git clone https://github.com/USER/code-indexer-skill.git
-
-# Глобально (для всех проектов)
-cp -r code-indexer-skill ~/.claude/skills/code-indexer
-
-# Или для конкретного проекта
-mkdir -p .claude/skills
-cp -r code-indexer-skill .claude/skills/code-indexer
-```
-
-### Способ 2: Прямое копирование файлов
-
-```bash
-# Глобально
-mkdir -p ~/.claude/skills/code-indexer
-cp SKILL.md ~/.claude/skills/code-indexer/
-cp -r references ~/.claude/skills/code-indexer/
-
-# Для проекта
-mkdir -p .claude/skills/code-indexer
-cp SKILL.md .claude/skills/code-indexer/
-cp -r references .claude/skills/code-indexer/
-```
-
-### Проверка установки скилла
-
-После установки скилл активируется по триггерам:
-- "найти определение", "поиск символа", "граф вызовов"
-- "find symbol", "call graph", "imports", "outline"
-- "code-indexer", "index", "references", "changed symbols"
-
-### Структура скилла
+## Plugin Structure
 
 ```
-code-indexer/
-├── SKILL.md                 # Основной файл скилла
-└── references/
-    └── mcp-fallback.md      # MCP fallback (только если CLI недоступен)
+code-indexer-skill/
+├── .claude-plugin/
+│   └── marketplace.json
+├── plugins/
+│   └── code-indexer/
+│       └── skills/
+│           └── code-indexer/
+│               └── SKILL.md
+├── docs/
+│   ├── usage.md
+│   └── mcp-fallback.md
+└── README.md
 ```
 
----
+## Contributing
 
-## Troubleshooting
+See [CONTRIBUTING.md](.github/CONTRIBUTING.md) for guidelines.
 
-### CLI проблемы
+## License
 
-| Проблема | Решение |
-|----------|---------|
-| `command not found` | Проверь PATH: `which code-indexer` |
-| Ошибки сборки Rust | Обнови Rust: `rustup update` |
-| Missing tree-sitter | `cargo clean && cargo build --release` |
-
-### Индексация проблемы
-
-| Проблема | Причина | Решение |
-|----------|---------|---------|
-| Пустые результаты | Индекс не создан | `code-indexer index` |
-| Устаревшие данные | Файлы изменились | `code-indexer index` (reindex) |
-| База corrupted | Concurrent writes | `code-indexer clear && code-indexer index` |
-| Медленный index | Большой проект | Используй `--watch` |
-
-### Важные замечания
-
-- **Добавь `.code-index.db` в `.gitignore`** — база создаётся в корне проекта
-- **Не используй `--deep-deps` для быстрых сессий** — это минуты вместо секунд
-- **SQLite single-writer** — не запускай параллельную запись в индекс
-
----
-
-## Поддерживаемые языки (17)
-
-| Язык | Расширения |
-|------|-----------|
-| Rust | `.rs` |
-| Java | `.java` |
-| Kotlin | `.kt`, `.kts` |
-| TypeScript | `.ts`, `.tsx`, `.js`, `.jsx` |
-| Python | `.py`, `.pyi` |
-| Go | `.go` |
-| C# | `.cs` |
-| C++ | `.cpp`, `.cc`, `.hpp`, `.h` |
-| SQL | `.sql` |
-| Bash | `.sh`, `.bash` |
-| Lua | `.lua` |
-| Swift | `.swift` |
-| Haskell | `.hs`, `.lhs` |
-| Elixir | `.ex`, `.exs` |
-| YAML | `.yml`, `.yaml` |
-| TOML | `.toml` |
-| HCL | `.tf`, `.hcl`, `.tfvars` |
-
----
-
-## Лицензия
-
-MIT License
+[MIT](LICENSE)

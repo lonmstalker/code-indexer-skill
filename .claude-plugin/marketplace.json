@@ -1,0 +1,43 @@
+{
+  "name": "code-indexer-skill",
+  "version": "1.0.0",
+  "owner": {
+    "name": "nikitakocnev",
+    "url": "https://github.com/nikitakocnev"
+  },
+  "metadata": {
+    "description": "CLI-first semantic code indexing and navigation for Claude Code",
+    "repository": "https://github.com/nikitakocnev/code-indexer-skill",
+    "license": "MIT",
+    "keywords": [
+      "code-indexer",
+      "semantic-search",
+      "call-graph",
+      "tree-sitter",
+      "code-navigation",
+      "symbol-search"
+    ]
+  },
+  "plugins": [
+    {
+      "name": "code-indexer",
+      "source": "./plugins/code-indexer",
+      "description": "CLI-first semantic code navigation with 77x faster than grep",
+      "version": "1.0.0",
+      "category": "development",
+      "license": "MIT",
+      "keywords": [
+        "code-indexer",
+        "semantic-search",
+        "call-graph",
+        "tree-sitter",
+        "symbols",
+        "definitions",
+        "references"
+      ],
+      "skills": [
+        "./skills/code-indexer/SKILL.md"
+      ]
+    }
+  ]
+}
