@@ -1,216 +1,185 @@
 ---
 name: code-indexer
-description: "CLI-first семантическая навигация и индексация через code-indexer. Use when you need to index a repo, collect AI-ready context, find definitions/references/symbols, build call graphs, inspect imports/outline, analyze git changes, search dependency symbols/sources, or manage tag inference rules. Keywords/triggers: code-indexer, index, prepare-context, symbols, definition, references, call-graph, outline, imports, deps, tags, stats, changed, поиск символа, найти определение, граф вызовов, кто вызывает."
+description: "MCP-first семантическая навигация и индексация через code-indexer. Use when you need to prepare context, find definitions/references/symbols, build call graphs, inspect imports/outline, analyze diagnostics/stats, navigate project compass, manage file tags, or work with dependencies. Keywords/triggers: code-indexer, mcp, prepare_context, get_context_bundle, search_symbols, list_symbols, find_definitions, find_references, analyze_call_graph, get_file_outline, get_imports, get_diagnostics, get_stats, get_project_compass, get_compass, manage_tags, open_session, close_session, index_workspace, update_files, поиск символа, найти определение, граф вызовов, кто вызывает."
 ---
 
-# Code Indexer (CLI-first)
+# Code Indexer (MCP-first)
 
 ## Принцип
-- **CLI-first**: всегда используй `code-indexer` CLI как основной способ.
-- **MCP — только fallback**: см. раздел "References (MCP fallback)".
+- **MCP-first**: если доступны MCP tools code-indexer, используй их как основной интерфейс.
+- **CLI — fallback**: только если MCP недоступен, либо нужен локальный сценарий (например, `code-indexer changed`).
 
-## Decision Tree (CLI)
+## Decision Tree (MCP-first)
 ```
 Нужно что-то сделать в коде?
-├── Текст/строка/комментарий → rg (НЕ code-indexer)
-├── Нужен AI-ready контекст по NL-запросу → code-indexer prepare-context "<QUERY>" [--file ... --task-hint ...]
-├── Символ (функция/тип/класс)?
-│   ├── Точное имя → code-indexer definition <NAME>
-│   ├── Частичное имя / список → code-indexer symbols <QUERY>
-│   └── Есть опечатка → code-indexer symbols <QUERY> --fuzzy
-├── Ссылки/использования → code-indexer references <NAME>
-│   └── Кто вызывает функцию → code-indexer references <NAME> --callers --depth N
-├── Граф вызовов → code-indexer call-graph <FUNC> --direction in|out|both --depth N
-├── Структура файла → code-indexer outline <FILE> [--start-line N --end-line M --scopes]
-├── Импорты → code-indexer imports <FILE> [--resolve]
-├── Изменённые символы (git) → code-indexer changed [--base HEAD|BRANCH] [--staged|--unstaged]
-├── Зависимости
-│   ├── Найти символ → code-indexer deps find <SYMBOL> [--dep NAME]
-│   └── Показать исходник символа → code-indexer deps source <SYMBOL> [--dep NAME --context N]
-└── Теги/intent слой файлов → code-indexer tags <subcommand>
+├── MCP tools доступны?
+│   ├── Да → MCP path
+│   │   ├── Индексация → index_workspace / update_files
+│   │   ├── AI-context → prepare_context (agent) или get_context_bundle (deterministic)
+│   │   ├── Поиск symbols → search_symbols / list_symbols / get_symbol
+│   │   ├── Определения → find_definitions
+│   │   ├── Ссылки/вызовы → find_references
+│   │   ├── Граф вызовов → analyze_call_graph
+│   │   ├── Структура/импорты → get_file_outline / get_imports
+│   │   ├── Диагностика/статус → get_diagnostics / get_stats / get_indexing_status
+│   │   ├── Макро-навигация проекта → get_project_compass / expand_project_node / get_compass / get_project_commands
+│   │   └── Теги файлов → manage_tags
+│   └── Нет → CLI fallback
+│       ├── Индексация → code-indexer index
+│       ├── Запросы → symbols|definition|references|call-graph|outline|imports|stats
+│       └── Git-изменения → changed
+└── Нужен поиск по строкам/комментариям → rg (НЕ code-indexer)
 ```
 
-## CLI Workflow (обязательный минимум)
-1. **Индексация**
-   - `code-indexer index` (или `code-indexer index <PATH>`)
-   - При долгой работе: `--watch`
-   - Для зависимостей: `--deep-deps` или `code-indexer deps index`
-   - Тюнинг индексации: `--profile eco|balanced|max`, `--durability safe|fast`, `--threads N`, `--throttle-ms N`
-2. **Проверка состояния**
-   - `code-indexer stats` — убедись, что индекс заполнен
+## MCP Workflow (обязательный минимум)
+1. **Индексация workspace**
+   - `index_workspace` (watch/include_deps при необходимости)
+2. **Проверка состояния индекса**
+   - `get_stats` (+ `get_indexing_status` для long-running индексации)
 3. **Запросы и анализ**
-   - symbols/definition/references/call-graph/outline/imports/changed/prepare-context
-4. **(Опционально) daemon-режим**
-   - `code-indexer serve --transport unix --socket /tmp/code-indexer.sock`
-   - затем query-команды с `--remote /tmp/code-indexer.sock`
+   - `search_symbols` / `find_definitions` / `find_references` / `analyze_call_graph` / `get_file_outline` / `get_imports`
+4. **Контекст для агента**
+   - `prepare_context` (agent-orchestrated)
+   - `get_context_bundle` (deterministic summary-first)
+5. **Token optimization (опционально)**
+   - `open_session` -> работа в рамках `session_id` -> `close_session`
+
+## CLI Fallback Workflow
+1. `code-indexer index`
+2. `code-indexer stats`
+3. Нужные команды (`symbols`/`definition`/`references`/`call-graph`/`outline`/`imports`)
+4. Для git-изменений: `code-indexer changed`
 
 ## Перед анализом спроси себя
-1. **Scope**: Весь проект или конкретный модуль?
-2. **Depth**: Один уровень вызовов или полный граф?
-3. **Dependencies**: Нужны ли внешние библиотеки?
-4. **Precision**: Достаточно ли fuzzy поиска или нужно точное имя?
-5. **Task Context**: Нужен ли orchestrated контекст (`prepare-context`) вместо ручного набора команд?
-
-## Производительность vs grep
-| Операция | code-indexer | grep | Ускорение |
-|----------|--------------|------|-----------|
-| Поиск определения | 0.007 сек | 0.539 сек | **77x** |
-| Граф вызовов | 0.007 сек | 0.380 сек | **54x** |
-| Cross-module поиск | 0.011 сек | 0.363 сек | **33x** |
+1. **Context Mode**: нужен agent-orchestrated контекст (`prepare_context`) или deterministic (`get_context_bundle`)?
+2. **Scope**: весь workspace или конкретный модуль/файл?
+3. **Depth**: один уровень ссылок или многоуровневый граф вызовов?
+4. **Dependencies**: нужны ли include_deps/dependency sources?
+5. **Session**: оправдано ли открывать `open_session` для экономии токенов?
 
 ## Экспертные trade-offs
 
-### call-graph vs references --callers
-- `references --callers` — плоский список вызовов (1 уровень).
-- `call-graph` — граф с глубиной (много уровней).
-- **Правило**: 1 уровень → `references --callers`, глубже → `call-graph --depth N`.
+### prepare_context vs get_context_bundle
+- `prepare_context` — orchestration через internal agent, быстрее для "дай контекст по задаче".
+- `get_context_bundle` — deterministic/schematic выход, удобнее для контролируемых pipelines.
+- **Правило**: exploratory/agent task -> `prepare_context`; строгий и воспроизводимый контекст -> `get_context_bundle`.
 
-### prepare-context vs ручные запросы
-- `prepare-context` — один NL-вход и готовый AI-context envelope (agent-orchestrated сбор).
-- Ручные команды (`symbols`/`definition`/`references`) — полный контроль и предсказуемость на каждом шаге.
-- **Правило**: нужен быстрый agent-ready snapshot → `prepare-context`; нужен точный forensic разбор → ручные команды.
+### search_symbols vs list_symbols
+- `search_symbols` — query-driven поиск (fuzzy/regex/filters).
+- `list_symbols` — обзор symbols без query (или с минимальными фильтрами).
+- **Правило**: есть конкретная гипотеза по имени -> `search_symbols`; обзор модуля/файла -> `list_symbols`.
 
-### index profile + durability
-- `--profile eco` — минимальная нагрузка, медленнее.
-- `--profile balanced` — default, безопасный компромисс.
-- `--profile max` — максимум параллелизма, быстрее, но горячее CPU.
-- `--durability safe` — надёжнее на длительных/важных индексах.
-- `--durability fast` — быстрее bulk-запись (лучше для short-lived локальных прогонов).
+### find_references vs analyze_call_graph
+- `find_references` — usages/callers (быстро и плоско).
+- `analyze_call_graph` — многослойные связи вызовов с направлением и depth.
+- **Правило**: impact-check 1-2 шага -> `find_references`; глубокий flow-analysis -> `analyze_call_graph`.
 
-### fuzzy-threshold
-- `0.7` (default) — баланс точности и шума.
-- `0.8-0.9` — меньше шума, хуже для опечаток.
-- `0.5-0.6` — максимум совпадений, много мусора.
+### get_stats vs get_indexing_status
+- `get_stats` — snapshot по текущему состоянию индекса.
+- `get_indexing_status` — runtime прогресс во время индексации.
+- **Правило**: регулярная проверка готовности -> `get_stats`; мониторинг ongoing indexing -> `get_indexing_status`.
 
-### dependencies: include_deps vs deps find
-- `definition --include-deps` — быстрый поиск определения в deps.
-- `deps find` — общий поиск по индексированным зависимостям.
-- **Правило**: точная цель → `definition --include-deps`; исследование → `deps find`.
-
-### --deep-deps
-- Включает индекс зависимостей вместе с проектом.
-- **Trade-off**: +контекст, но индекс растёт в 10–50x и медленнее строится.
-
-### changed: staged/unstaged
-- Без `--staged/--unstaged` команда показывает все uncommitted изменения.
-- `--staged` / `--unstaged` — когда нужно строго разделить индекс/рабочее дерево.
-- **Правило**: быстрый обзор текущей ветки → без флагов; подготовка commit/review → включай нужный флаг явно.
+### MCP vs CLI for changed symbols
+- MCP фокусируется на семантическом API workspace.
+- `code-indexer changed` остаётся практичным git-aware локальным fallback.
+- **Правило**: приоритет MCP; для git diff по локальной ветке допустим CLI fallback.
 
 ## NEVER (анти-паттерны)
-- **NEVER** используй code-indexer для строк/комментариев — tree-sitter их не индексирует → используй `rg`.
-- **NEVER** запускай `--deep-deps` для быстрых сессий — это минуты вместо секунд.
-- **NEVER** доверяй `possible` в call-graph без ручной проверки.
-- **NEVER** смешивай индексы разных проектов в одном `--db`.
-- **NEVER** забывай про `.code-index.db` — добавь в `.gitignore`.
-- **NEVER** запускай queries без `code-indexer stats` — убедись что индекс существует.
-- **NEVER** используй одновременный write доступ — SQLite single-writer.
-- **NEVER** используй legacy `code-indexer query ...` в новых сценариях — команда deprecated.
-- **NEVER** запускай `prepare-context` без валидного `agent.*` в корневом `.code-indexer.yml`.
+- **NEVER** начинай с CLI, если MCP tools доступны и работают.
+- **NEVER** используй deprecated MCP aliases, когда доступны consolidated tools.
+- **NEVER** используй code-indexer для строк/комментариев — применяй `rg`.
+- **NEVER** доверяй `possible` вызовам в call graph без ручной верификации.
+- **NEVER** забывай закрывать long-lived session (`close_session`) после `open_session`.
+- **NEVER** смешивай разные проекты в одной DB при CLI fallback (`--db`).
+- **NEVER** запускай CLI queries без проверки индекса (`code-indexer stats`) при fallback сценарии.
 
-## Patterns (CLI-first)
+## Patterns (MCP-first)
 
-### Быстрое понимание проекта
-```bash
-code-indexer index
-code-indexer stats
-code-indexer symbols "main" --kind function
-code-indexer outline src/main.rs
+### Быстрый onboarding в проект
+- `index_workspace`
+- `get_stats`
+- `get_project_compass`
+- `expand_project_node`
+- `get_compass`
+
+### Task-oriented context для агента
+- `prepare_context` с `query`, `file`, `task_hint`
+- при необходимости follow-up через `suggested_tool_calls`
+
+### Детерминированная контекстная выжимка
+- `get_context_bundle` с budget/format
+- затем точечные `find_definitions`/`find_references`
+
+### Анализ влияния рефакторинга
+- `search_symbols`
+- `find_references` (include_callers/depth)
+- `analyze_call_graph` (direction/depth)
+
+### Работа с unsaved изменениями
+- `update_files`
+- повторные `search_symbols`/`find_definitions` для overlay-результатов
+
+### Теги и intent слой
+- `manage_tags` (add/remove/list/preview/apply/stats)
+
+## Quick Reference
+
+### MCP-first
+```text
+index_workspace
+update_files
+list_symbols
+search_symbols
+get_symbol
+find_definitions
+find_references
+analyze_call_graph
+get_file_outline
+get_imports
+get_diagnostics
+get_stats
+get_context_bundle
+prepare_context
+get_doc_section
+get_project_commands
+get_project_compass
+expand_project_node
+get_compass
+open_session
+close_session
+manage_tags
+get_indexing_status
 ```
 
-### AI-ready context для внешнего агента
+### CLI fallback
 ```bash
-code-indexer prepare-context "where is auth token validated?" \
-  --file src/auth/middleware.rs \
-  --task-hint debugging \
-  --agent-timeout-sec 60 \
-  --agent-max-steps 6
-```
-
-### Подготовка к рефакторингу
-```bash
-code-indexer call-graph "TargetFn" --direction in --depth 3
-code-indexer references "TargetType" --callers
-```
-
-### Проверка изменений
-```bash
-code-indexer changed --base HEAD
-code-indexer changed --staged
-code-indexer changed --unstaged
-```
-
-### Исследование символа в зависимостях
-```bash
-code-indexer deps find "Serialize" --dep "serde"
-code-indexer deps source "Serialize" --dep "serde" --context 15
-```
-
-### Правила тегов (intent layer)
-```bash
-code-indexer tags add-rule "domain:auth" --pattern "**/auth/**" --confidence 0.8
-code-indexer tags list-rules --format json
-code-indexer tags preview src/auth/service.rs
-code-indexer tags apply
-```
-
-## Quick Reference (CLI)
-```bash
-# Индексация
+# Индексация и сервис
 code-indexer index [PATH]
-code-indexer index --watch
-code-indexer index --deep-deps
-code-indexer index --profile eco|balanced|max --durability safe|fast
-code-indexer index --threads N --throttle-ms N
-
-# MCP server / daemon
-code-indexer serve
+code-indexer stats
 code-indexer serve --transport unix --socket /tmp/code-indexer.sock
 
-# Agent context
-code-indexer prepare-context "<QUERY>" [--file FILE --task-hint HINT --remote SOCK]
-
-# Поиск и навигация
-code-indexer symbols <QUERY> [--fuzzy]
-code-indexer symbols [--kind function|type|all --limit N --language LANG --pattern GLOB]
+# Поиск и анализ
+code-indexer symbols [QUERY] [--fuzzy]
 code-indexer definition <NAME>
 code-indexer references <NAME> [--callers --depth N]
-
-# Анализ
 code-indexer call-graph <FUNC> --direction in|out|both --depth N
-code-indexer outline <FILE> [--start-line N --end-line M --scopes]
+code-indexer outline <FILE>
 code-indexer imports <FILE> [--resolve]
-code-indexer changed [--base HEAD|BRANCH] [--staged|--unstaged]
 
-# Зависимости
-code-indexer deps list [PATH] [--dev] [--format text|json]
-code-indexer deps index [PATH] [--name NAME] [--dev]
-code-indexer deps find <SYMBOL> [--dep NAME]
-code-indexer deps source <SYMBOL> [--dep NAME --context N]
-code-indexer deps info <NAME> [PATH]
-
-# Tags / intent layer
-code-indexer tags add-rule <TAG> --pattern "<GLOB>" [PATH]
-code-indexer tags remove-rule --pattern "<GLOB>" [PATH]
-code-indexer tags list-rules [--format text|json] [PATH]
-code-indexer tags preview <FILE> [PATH]
-code-indexer tags apply [PATH]
-code-indexer tags stats
-
-# Сервис
-code-indexer stats [--remote SOCK]
-code-indexer clear
+# Git / deps / tags
+code-indexer changed [--base REF] [--staged|--unstaged]
+code-indexer deps list|index|find|source|info
+code-indexer tags add-rule|remove-rule|list-rules|preview|apply|stats
 ```
 
 ## Troubleshooting
-- Пустые результаты: индекс не создан → `code-indexer index`.
-- Устаревшие данные: файлы изменились → переиндексируй (`code-indexer index`), затем `code-indexer stats`.
-- База corrupted: concurrent writes → `code-indexer clear && code-indexer index`.
-- Медленный index / высокая температура CPU: используй `--profile eco` и `--throttle-ms`.
-- `prepare-context` падает: проверь `agent.*` в корневом `.code-indexer.yml` (provider/model/endpoint/auth).
-- Ошибка `--remote`: убедись, что daemon запущен и `--socket` путь совпадает.
-- `possible` вызовы в call-graph: это uncertain edges, проверяй вручную.
+- MCP tools не видны: проверь конфиг MCP-клиента и доступность `code-indexer serve` endpoint.
+- `prepare_context` возвращает ошибку: проверь `agent.*` в корневом `.code-indexer.yml`.
+- Пустые результаты после индексирования: вызови `get_stats` и проверь scope/path.
+- Overlay не учитывается: убедись, что `update_files` отправлен до query.
+- Высокое потребление токенов: используй `open_session` + compact/minimal форматы.
+- В fallback CLI stale данные: переиндексируй (`code-indexer index`), затем `code-indexer stats`.
 
-## References (MCP fallback)
-**Загружать ТОЛЬКО если CLI недоступен** или требуется MCP-интеграция.
-- MANDATORY: прочитай `docs/mcp-fallback.md` полностью (если доступен в репозитории).
-- Do NOT load, если CLI доступен.
+## References
+- Основной MCP-путь: `docs/mcp-fallback.md` (описание MCP-first и CLI fallback)
+- CLI reference: `docs/usage.md`

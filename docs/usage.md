@@ -2,6 +2,10 @@
 
 Complete reference for the current `code-indexer` CLI API.
 
+## MCP-first Note
+
+If MCP tools are available, use MCP as the primary interface and treat this document as CLI fallback reference. See `docs/mcp-fallback.md` for MCP-first workflow.
+
 ## Installation
 
 ### From Source

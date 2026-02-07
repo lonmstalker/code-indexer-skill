@@ -1,46 +1,142 @@
-# MCP Fallback (только если CLI недоступен)
+# MCP-first Guide (с CLI fallback)
 
 ## Принцип
-MCP — запасной маршрут. Используй его только если нельзя вызвать `code-indexer` CLI.
+Используй MCP tools `code-indexer` как основной интерфейс.
+CLI — только fallback, если MCP недоступен или нужен локальный git-aware сценарий.
 
-## CLI -> MCP mapping
+## Project MCP setup reference (Codex, Claude)
 
-- `code-indexer index` -> `index_workspace`
-- `code-indexer index --watch` -> `index_workspace` with `watch=true`
-- `code-indexer index --deep-deps` -> `index_workspace` with `include_deps=true`
-- Инкрементальные/несохранённые изменения -> `update_files`
+### Codex (project-level)
 
-- `code-indexer symbols [QUERY]` -> `list_symbols` (без query) / `search_symbols` (с query)
-- `code-indexer definition <NAME>` -> `find_definitions`
-- `code-indexer references <NAME>` -> `find_references`
-- `code-indexer call-graph <FUNC>` -> `analyze_call_graph`
-- `code-indexer outline <FILE>` -> `get_file_outline`
-- `code-indexer imports <FILE>` -> `get_imports`
-- `code-indexer stats` -> `get_stats`
-- Диагностика/мертвый код -> `get_diagnostics`
+Создай в корне проекта `.codex/config.toml`:
 
-- `code-indexer prepare-context "<QUERY>"` -> `prepare_context` (agent-orchestrated)
-- Deterministic контекст без agent orchestration -> `get_context_bundle`
+```toml
+[mcp_servers.code-indexer]
+command = "docker"
+args = [
+  "run",
+  "--rm",
+  "-i",
+  "-v",
+  ".:/workspace",
+  "-w",
+  "/workspace",
+  "-e",
+  "OPENAI_API_KEY",
+  "-e",
+  "ANTHROPIC_API_KEY",
+  "-e",
+  "OPENROUTER_API_KEY",
+  "lonmstalkerd/code-indexer:latest",
+  "--db",
+  "/workspace/.code-index.db",
+  "serve",
+]
+```
 
-- `code-indexer tags add-rule/remove-rule/list-rules/preview/apply/stats` -> `manage_tags` with corresponding `action`
-- Прогресс длинной индексации -> `get_indexing_status`
+Проверка:
 
-## Project compass and commands (MCP-only)
+```bash
+codex mcp list
+```
 
-- `get_project_compass` — макро-обзор проекта
-- `expand_project_node` — детальный drill-down по узлу
-- `get_compass` — task-oriented diversified search
-- `get_project_commands` — извлечение run/build/test команд из конфигов
+### Claude Code (project-level)
 
-## Sessions (token optimization)
+Вариант 1: через CLI (из корня проекта):
 
-- `open_session` — открыть session и получить mapping
-- `close_session` — закрыть session
+```bash
+claude mcp add -s project code-indexer -- \
+  docker run --rm -i \
+  -v "$PWD:/workspace" \
+  -w /workspace \
+  -e OPENAI_API_KEY \
+  -e ANTHROPIC_API_KEY \
+  -e OPENROUTER_API_KEY \
+  lonmstalkerd/code-indexer:latest \
+  --db /workspace/.code-index.db \
+  serve
+```
 
-Используй session, только если schema конкретных tool-вызовов позволяет передавать `session_id`.
+Вариант 2: через `.mcp.json` в корне проекта:
+
+```json
+{
+  "mcpServers": {
+    "code-indexer": {
+      "command": "docker",
+      "args": [
+        "run",
+        "--rm",
+        "-i",
+        "-v",
+        ".:/workspace",
+        "-w",
+        "/workspace",
+        "-e",
+        "OPENAI_API_KEY",
+        "-e",
+        "ANTHROPIC_API_KEY",
+        "-e",
+        "OPENROUTER_API_KEY",
+        "lonmstalkerd/code-indexer:latest",
+        "--db",
+        "/workspace/.code-index.db",
+        "serve"
+      ]
+    }
+  }
+}
+```
+
+Проверка:
+
+```bash
+claude mcp list
+```
+
+## MCP-first: рекомендуемый порядок
+
+1. `index_workspace` — индексация workspace
+2. `get_stats` / `get_indexing_status` — проверка готовности индекса
+3. Основные запросы:
+   - `search_symbols` / `list_symbols` / `get_symbol`
+   - `find_definitions`
+   - `find_references`
+   - `analyze_call_graph`
+   - `get_file_outline`
+   - `get_imports`
+4. Контекст для агента:
+   - `prepare_context` (agent orchestrated)
+   - `get_context_bundle` (deterministic summary-first)
+5. Макро-навигация:
+   - `get_project_compass`
+   - `expand_project_node`
+   - `get_compass`
+   - `get_project_commands`
+6. При длительных сессиях:
+   - `open_session` -> работа -> `close_session`
+
+## CLI fallback mapping (если MCP недоступен)
+
+- `index_workspace` -> `code-indexer index`
+- `index_workspace (watch=true)` -> `code-indexer index --watch`
+- `index_workspace (include_deps=true)` -> `code-indexer index --deep-deps`
+- `get_stats` -> `code-indexer stats`
+
+- `search_symbols` / `list_symbols` -> `code-indexer symbols [QUERY]`
+- `find_definitions` -> `code-indexer definition <NAME>`
+- `find_references` -> `code-indexer references <NAME>`
+- `analyze_call_graph` -> `code-indexer call-graph <FUNC>`
+- `get_file_outline` -> `code-indexer outline <FILE>`
+- `get_imports` -> `code-indexer imports <FILE>`
+
+- `prepare_context` -> `code-indexer prepare-context "<QUERY>"`
+- `manage_tags` -> `code-indexer tags <subcommand>`
+
+- Для changed symbols используй `code-indexer changed` (локальный git-aware fallback).
 
 ## Notes
 
-- Приоритет всегда у CLI: MCP не должен заменять CLI при рабочем локальном бинаре.
-- Legacy MCP aliases могут работать, но используй consolidated names (`search_symbols`, `find_definitions`, etc.).
-- Для `changed`-анализа предпочтителен CLI (`code-indexer changed`), так как это git-aware локальный сценарий.
+- При работающем MCP не переключайся на CLI без причины.
+- Предпочитай consolidated tool names (не legacy aliases).
+- Для несохранённых изменений используй `update_files` до поисковых запросов.
